@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Food Nutrition Analyzer</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+  <header>
+    <h1>🥗 Food Nutrition Analyzer</h1>
+    <p class="subtitle">
+      Analyze food nutrition, compare foods, calculate BMI, and get AI-powered health insights.
+    </p>
+  </header>
+
+  <!-- ANALYZE FOOD -->
+  <section class="card">
+    <h2>Analyze Food</h2>
+    <p class="desc">Enter any food item to get nutrition details and health score.</p>
+
+    <input id="food" placeholder="e.g. banana, rice, egg">
+    <button onclick="analyzeFood()">Analyze</button>
+
+    <div id="foodResult" class="result"></div>
+
+    <div class="progress">
+      <div id="scoreBar"></div>
+    </div>
+
+    <small class="hint">Health score is calculated based on calories, fat, carbs and protein.</small>
+
+    <canvas id="nutritionChart"></canvas>
+  </section>
+
+  <!-- BMI + DAILY CALORIES -->
+  <section class="card">
+    <h2>BMI & Daily Calories</h2>
+    <p class="desc">Calculate your Body Mass Index and recommended daily calories.</p>
+
+    <input id="height" placeholder="Height (meters)">
+    <input id="weight" placeholder="Weight (kg)">
+    <button onclick="calculateBMI()">Calculate</button>
+
+    <div id="bmiResult" class="result"></div>
+  </section>
+
+  <!-- MEAL RECOMMENDATION -->
+  <section class="card">
+    <h2>Meal Recommendation</h2>
+    <p class="desc">Get AI-based meal suggestions based on your health goal.</p>
+
+    <select id="goal">
+      <option value="balanced">Balanced Diet</option>
+      <option value="weight_loss">Weight Loss</option>
+      <option value="muscle_gain">Muscle Gain</option>
+    </select>
+
+    <button onclick="getMeal()">Get Recommendation</button>
+
+    <div id="mealResult" class="result"></div>
+  </section>
+
+  <!-- FOOD COMPARISON -->
+  <section class="card">
+    <h2>🥊 Food Comparison</h2>
+    <p class="desc">Compare two foods and see which one is healthier.</p>
+
+    <input id="food1" placeholder="Food 1">
+    <input id="food2" placeholder="Food 2">
+    <button onclick="compareFoods()">Compare</button>
+
+    <div id="compareResult" class="compare-grid"></div>
+  </section>
+
+  <footer>
+    <p>
+      Built with ❤️ using Flask, Chart.js & AI concepts <br>
+      Food Nutrition Analyzer – Academic Project
+    </p>
+  </footer>
+
+<script>
+let chart;
+
+/* -------- ANALYZE FOOD -------- */
+function analyzeFood() {
+  fetch("/analyze", {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: "food=" + document.getElementById("food").value
+  })
+  .then(res => res.json())
+  .then(data => {
+    let color = data.health_score >= 80 ? "green" :
+                data.health_score >= 60 ? "orange" : "red";
+
+    let label = data.health_score >= 80 ? "Excellent" :
+                data.health_score >= 60 ? "Good" : "Poor";
+
+    document.getElementById("foodResult").innerHTML = `
+      <p><b>Calories:</b> ${data.nutrition.calories}</p>
+      <p><b>Protein:</b> ${data.nutrition.protein} g</p>
+      <p><b>Carbs:</b> ${data.nutrition.carbs} g</p>
+      <p><b>Fat:</b> ${data.nutrition.fat} g</p>
+      <span class="badge ${color}">
+        Health Score: ${data.health_score} (${label})
+      </span>
+      <p class="tip">${data.health_tip}</p>
+    `;
+
+    const bar = document.getElementById("scoreBar");
+    bar.style.width = data.health_score + "%";
+    bar.className = color;
+
+    drawChart(data.nutrition);
+  });
+}
+
+/* -------- CHART -------- */
+function drawChart(nutrition) {
+  const ctx = document.getElementById("nutritionChart").getContext("2d");
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: ["Calories", "Protein", "Carbs", "Fat"],
+      datasets: [{
+        data: [
+          nutrition.calories,
+          nutrition.protein,
+          nutrition.carbs,
+          nutrition.fat
+        ],
+        backgroundColor: ["#e53935", "#43a047", "#1e88e5", "#fb8c00"]
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+/* -------- BMI -------- */
+function calculateBMI() {
+  fetch("/bmi", {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body:
+      "height=" + document.getElementById("height").value +
+      "&weight=" + document.getElementById("weight").value
+  })
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById("bmiResult").innerHTML = `
+      <p><b>BMI:</b> ${data.bmi} (${data.category})</p>
+      <p>
+        <b>Recommended Daily Calories:</b> ${data.daily_calories} kcal
+      </p>
+      <small class="hint">
+        Based on BMI category and general dietary guidelines.
+      </small>
+    `;
+  });
+}
+
+/* -------- MEAL -------- */
+function getMeal() {
+  fetch("/meal", {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: "goal=" + document.getElementById("goal").value
+  })
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById("mealResult").innerHTML =
+      `<p>${data.recommended_foods.join(", ")}</p>`;
+  });
+}
+
+/* -------- COMPARE -------- */
+function compareFoods() {
+  fetch("/compare", {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body:
+      "food1=" + document.getElementById("food1").value +
+      "&food2=" + document.getElementById("food2").value
+  })
+  .then(res => res.json())
+  .then(data => {
+    const f1 = data.food1_nutrition;
+    const f2 = data.food2_nutrition;
+
+    document.getElementById("compareResult").innerHTML = `
+      <div class="winner-banner">${data.comparison.verdict}</div>
+
+      <div class="compare-card">
+        <h3>${document.getElementById("food1").value.toUpperCase()}</h3>
+        <p>Calories: ${f1.calories}</p>
+        <p>Protein: ${f1.protein} g</p>
+        <p>Carbs: ${f1.carbs} g</p>
+        <p>Fat: ${f1.fat} g</p>
+        <span class="badge">Score: ${data.comparison.food1_score}</span>
+      </div>
+
+      <div class="compare-card">
+        <h3>${document.getElementById("food2").value.toUpperCase()}</h3>
+        <p>Calories: ${f2.calories}</p>
+        <p>Protein: ${f2.protein} g</p>
+        <p>Carbs: ${f2.carbs} g</p>
+        <p>Fat: ${f2.fat} g</p>
+        <span class="badge">Score: ${data.comparison.food2_score}</span>
+      </div>
+    `;
+  });
+}
+</script>
+
+</body>
+</html>
